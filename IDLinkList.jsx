@@ -78,7 +78,6 @@ var OptionDialog = function() {
 
     var selectFolder = function() {
 	var folder = Folder.selectDialog("処理対象フォルダの選択");
-	$.writeln(folder);
 	if(folder) {
 	    // フォルダが選択された
 	    option.targetFolder = folder;
