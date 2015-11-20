@@ -7,6 +7,8 @@
   Changes
   Version 1.0.0
   - 初期バージョン
+  Version 1.1.0 (2015/11/20)
+  - ファイルオープン時などにエラーが発生した場合，中断せず，最後にエラーログを書き出すよう変更。
 */
 #target indesign
 
@@ -188,19 +190,25 @@ OptionDialog.prototype.show = function(handler) {
 
 var LinkAnalyzer = function() {
     this.links = [];
+    this.errors = [];
 };
 
 LinkAnalyzer.prototype.findFileInFolder = function(folder) {
     var files = folder.getFiles("*");
     for(var i=0; i<files.length; ++i) {
-	var f = files[i];
-	if(f instanceof Folder) {
-	    this.findFileInFolder(f);
+	try {
+	    var f = files[i];
+	    if(f instanceof Folder) {
+		this.findFileInFolder(f);
+	    }
+	    else if(f.name.match(/\.indd$/)){
+		var doc = app.open(f);
+		this.analyzeDoc(doc);
+		doc.close(SaveOptions.NO);
+	    }
 	}
-	else if(f.name.match(/\.indd$/)){
-	    var doc = app.open(f);
-	    this.analyzeDoc(doc);
-	    doc.close(SaveOptions.NO);
+	catch(e) {
+	    this.errors.push(e);
 	}
     }
 };
@@ -251,6 +259,17 @@ LinkAnalyzer.prototype.run = function(option) {
 	}
 	saveFile.close();
     }
+
+    if(this.errors.length > 0) {
+	alert("いくつかのエラーが発生しました。エラー内容を保存するファイル名を指定してください。");
+	var errorLogFile = this.getErrLogFile();
+	if(errorLogFile && errorLogFile.open("w")) {
+	    for(var i=0; i<this.errors.length; ++i) {
+		errorLogFile.writeln(this.errors[i].description);
+	    }
+	    errorLogFile.close();
+	}
+    }
 }
 
 LinkAnalyzer.prototype.toXML = function() {
@@ -293,6 +312,15 @@ LinkAnalyzer.prototype.toText = function() {
 	    + record.link + "\n";
     }
     return text;
+}
+
+LinkAnalyzer.prototype.getErrLogFile = function() {
+    var filter = "*.txt";
+    var file = new File("linklist.txt");
+    file = file.saveDlg("エラーログファイル名を指定してください。",
+			filter,
+			false);
+    return file;
 }
 
 LinkAnalyzer.prototype.getSaveFile = function(exportType) {
